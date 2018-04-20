@@ -24,24 +24,16 @@ import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.*;
 import javax.inject.Inject;
-import java.util.*;
-
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.REALM;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
-import static org.forgerock.openam.auth.node.api.Action.send;
 import org.forgerock.openam.core.CoreWrapper;
-import com.iplanet.sso.SSOException;
 import com.sun.identity.idm.*;
 
-import java.util.List;
-import java.util.ResourceBundle;
+import java.util.*;
 
 import org.forgerock.util.i18n.PreferredLocales;
 
-
-
-
-
+import com.sun.identity.idm.IdUtils;
 
 
 @Node.Metadata(outcomeProvider = SearchForUserNode.OutcomeProvider.class,
@@ -57,7 +49,20 @@ public class SearchForUserNode implements Node {
      */
     public interface Config {
 
-        //Nothing to configure
+        /**
+         * A map of property name to value.
+         * @return a map of properties.
+         */
+        @Attribute(order = 100)
+        default String sharedStateAttribute() {
+            return USERNAME;
+        };
+
+        //Toggle as to whether UA is stored in the clear or SHA256 hashed for privacy
+        @Attribute(order = 200)
+        default String datastoreAttribute() {
+            return USERNAME;
+        }
 
     }
 
@@ -77,10 +82,20 @@ public class SearchForUserNode implements Node {
     @Override
     public Action process(TreeContext context) throws NodeProcessException {
    
-        debug.message("[" + DEBUG_FILE + "]: " + "Starting");    
+        debug.message("[" + DEBUG_FILE + "]: " + "Starting");
+        AMIdentity userIdentity = null;
 
         //Pull out the user object
-        AMIdentity userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(),context.sharedState.get(REALM).asString());
+        if (config.datastoreAttribute() == USERNAME && config.sharedStateAttribute() == USERNAME){
+            userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(),context.sharedState.get(REALM).asString());
+        } else {
+            Set<String> userSearchAttributes = new HashSet<>();
+            userSearchAttributes.add(config.datastoreAttribute());
+            debug.message("[" + DEBUG_FILE + "]: " + "Datastore attribute: {}", config.datastoreAttribute());
+            debug.message("[" + DEBUG_FILE + "]: " + "Shared state attribute: {}, and value: {}", config.sharedStateAttribute(), context.sharedState.get(config.sharedStateAttribute()).asString());
+            userIdentity = IdUtils.getIdentity(context.sharedState.get(config.sharedStateAttribute()).asString(), context.sharedState.get(REALM).asString(),userSearchAttributes);
+
+        }
 
         try {
 
@@ -91,7 +106,9 @@ public class SearchForUserNode implements Node {
 
                 } else {
 
-                    debug.message("[" + DEBUG_FILE + "]: " + "user found");
+                    debug.message("[" + DEBUG_FILE + "]: " + "user found: {}", userIdentity.getName());
+                    //ensure username is set in sharedstate
+                    context.sharedState.put(USERNAME, userIdentity.getName());
                     return goTo("found").build();
 
                 }
