@@ -18,22 +18,22 @@
 package org.forgerock.openam.auth.nodes;
 
 import com.google.inject.assistedinject.Assisted;
+import com.iplanet.sso.SSOException;
 import com.sun.identity.shared.debug.Debug;
+import com.sun.identity.sm.DNMapper;
 import org.forgerock.guava.common.collect.ImmutableList;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.*;
 import javax.inject.Inject;
+import static com.sun.identity.idm.IdUtils.getAMIdentityRepository;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.REALM;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 import org.forgerock.openam.core.CoreWrapper;
 import com.sun.identity.idm.*;
-
 import java.util.*;
-
+import org.forgerock.openam.utils.CollectionUtils;
 import org.forgerock.util.i18n.PreferredLocales;
-
-import com.sun.identity.idm.IdUtils;
 
 
 @Node.Metadata(outcomeProvider = SearchForUserNode.OutcomeProvider.class,
@@ -58,10 +58,10 @@ public class SearchForUserNode implements Node {
             return USERNAME;
         };
 
-        //Toggle as to whether UA is stored in the clear or SHA256 hashed for privacy
+
         @Attribute(order = 200)
-        default String datastoreAttribute() {
-            return USERNAME;
+        default List<String> datastoreAttributes() {
+            return Arrays.asList("username");
         }
 
     }
@@ -79,51 +79,61 @@ public class SearchForUserNode implements Node {
         this.coreWrapper = coreWrapper;
     }
 
+
     @Override
     public Action process(TreeContext context) throws NodeProcessException {
    
         debug.message("[" + DEBUG_FILE + "]: " + "Starting");
         AMIdentity userIdentity = null;
 
-        //Pull out the user object
-        if (config.datastoreAttribute() == USERNAME && config.sharedStateAttribute() == USERNAME){
-            userIdentity = coreWrapper.getIdentity(context.sharedState.get(USERNAME).asString(),context.sharedState.get(REALM).asString());
-        } else {
-            Set<String> userSearchAttributes = new HashSet<>();
-            userSearchAttributes.add(config.datastoreAttribute());
-            debug.message("[" + DEBUG_FILE + "]: " + "Datastore attribute: {}", config.datastoreAttribute());
-            debug.message("[" + DEBUG_FILE + "]: " + "Shared state attribute: {}, and value: {}", config.sharedStateAttribute(), context.sharedState.get(config.sharedStateAttribute()).asString());
-            userIdentity = IdUtils.getIdentity(context.sharedState.get(config.sharedStateAttribute()).asString(), context.sharedState.get(REALM).asString(),userSearchAttributes);
+        Set<String> userSearchAttributes = new HashSet<String>(config.datastoreAttributes());
 
+        AMIdentityRepository amIdRepo = getAMIdentityRepository(DNMapper.orgNameToDN(context.sharedState.get(REALM).asString()));
+        IdSearchControl idsc = new IdSearchControl();
+        idsc.setRecursive(true);
+        idsc.setAllReturnAttributes(true);
+        Set results = Collections.EMPTY_SET;
+        String searchUsername = context.sharedState.get(config.sharedStateAttribute()).asString();
+
+        IdSearchResults searchResults;
+        try {
+            idsc.setMaxResults(0);
+            Map<String, Set<String>> searchAVP = CollectionUtils.toAvPairMap(userSearchAttributes, searchUsername);
+            idsc.setSearchModifiers(IdSearchOpModifier.OR, searchAVP);
+            searchResults = amIdRepo.searchIdentities(IdType.USER, "*", idsc);
+
+            if (searchResults != null) {
+                results = searchResults.getSearchResults();
+            }
+
+            if (results == null || results.size() == 0) {
+                debug.error("[" + DEBUG_FILE + "]: " + "Unable to find any matching user");
+                return Action.goTo("notFound").build();
+            }
+
+            if (results.size() != 1) {
+                debug.error("[" + DEBUG_FILE + "]: " + "More than one matching user profile found - ambiguous");
+                return Action.goTo("ambiguous").build();
+            }
+
+            userIdentity = (AMIdentity)results.iterator().next();
+        } catch (IdRepoException e) {
+            debug.warning("Error searching for user identity");
+        } catch (SSOException e) {
+            debug.warning("Error searching for user identity");
         }
 
-        try {
-
-                if (userIdentity == null) {
-
-                    debug.error("[" + DEBUG_FILE + "]: " + "Unable to find user");
-                    return goTo("notFound").build();
-
-                } else {
-
-                    debug.message("[" + DEBUG_FILE + "]: " + "user found: {}", userIdentity.getName());
-                    //ensure username is set in sharedstate
-                    context.sharedState.put(USERNAME, userIdentity.getName());
-                    return goTo("found").build();
-
-                }
-
-
-            } catch (Exception e) {
-
-                debug.error("[" + DEBUG_FILE + "]: " + "Node exception", e);
-                return goTo("notFound").build();
-            }
+        debug.message("[" + DEBUG_FILE + "]: " + "user found: {}", userIdentity.getName());
+        //ensure username is set in sharedstate
+        context.sharedState.put(USERNAME, userIdentity.getName());
+        return goTo("found").build();
     }
+
 
     private Action.ActionBuilder goTo(String outcome) {
         return Action.goTo(outcome);
     }
+
 
     static final class OutcomeProvider implements org.forgerock.openam.auth.node.api.OutcomeProvider {
         private static final String BUNDLE = SearchForUserNode.class.getName().replace(".", "/");
@@ -133,7 +143,9 @@ public class SearchForUserNode implements Node {
             ResourceBundle bundle = locales.getBundleInPreferredLocale(BUNDLE, OutcomeProvider.class.getClassLoader());
             return ImmutableList.of(
                     new Outcome( "found", bundle.getString("found")),
-                    new Outcome("notFound", bundle.getString("notFound")));
+                    new Outcome("notFound", bundle.getString("notFound")),
+                    new Outcome("ambiguous", bundle.getString("ambiguous")));
         }
     }
 }
+
