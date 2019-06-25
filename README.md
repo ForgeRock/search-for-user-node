@@ -15,7 +15,7 @@
 -->
 # Search For User Authentication Tree Node
 
-A simple authentication node for ForgeRock's Identity Platform 5.5 and above. This node searches the user data store for a matching identity based on configurable search attributes. See screenshot below for an example.
+A simple authentication node for ForgeRock's Identity Platform 5.5 and above. This node searches the user data store for a matching identity based on configurable search attributes. Possible outcomes are "found" - a unique match is found, "ambiguous" - multiple potential matches found, or "not found" - no matching identity. See screenshot below for an example.
 
 ## Installation
 
@@ -31,7 +31,6 @@ The code in this repository has binary dependencies that live in the ForgeRock m
 Edit the necessary SearchForUserNode.java as appropriate.  To rebuild, run "mvn clean install" in the directory containing the pom.xml  
 
 ![ScreenShot](./search-for-user-1.png)
-![ScreenShot](./search-for-user-2.png)
 
 ## Disclaimer
 The sample code described herein is provided on an "as is" basis, without warranty of any kind, to the fullest extent permitted by law. ForgeRock does not warrant or guarantee the individual success developers may have in implementing the sample code on their development platforms or in production configurations.
