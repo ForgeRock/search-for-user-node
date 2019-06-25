@@ -15,24 +15,23 @@
 -->
 # Search For User Authentication Tree Node
 
-A simple authentication node for ForgeRock's Identity Platform 5.5 and above. This node searches for a user based on a set of configurable user search profile attributes. 
+A simple authentication node for ForgeRock's Identity Platform 5.5 and above. This node checks if a user exists.
 
 ## Installation
 
 Copy the .jar file from the ../target directory into the ../web-container/webapps/openam/WEB-INF/lib directory where AM is deployed.  Restart the web container to pick up the new node.  The node will then appear in the authentication trees components palette.
 ## Usage
 
-Deploy the node and set the configuration as appropriate. Set 'sharedStateAttribute' to the name of the shared state attribute which holds the value to search for (default: username). Set 'datastoreAttributes' to the set of user profile attributes to search. For example, to allow a user to login using either username, email adress, or their full name, add "uid", "mail", and "cn".
-
-Wire the outcomes as appropriate. Where a search results in multiple matching user profiles, the outcome "ambiguous" is generated. 
+Deploy the node and wire the appropriate exhausts.
 
 ## To Build
 
 The code in this repository has binary dependencies that live in the ForgeRock maven repository. Maven can be configured to authenticate to this repository by following the following [ForgeRock Knowledge Base Article](https://backstage.forgerock.com/knowledge/kb/article/a74096897).
 
-Edit the necessary SearchForUserNode.java as appropriate.  To rebuild, run "mvn clean install" in the directory containing the pom.xml  
+Edit the necessary ProfileAttributeDecisionNode.java as appropriate.  To rebuild, run "mvn clean install" in the directory containing the pom.xml  
 
 ![ScreenShot](./search-for-user-1.png)
+![ScreenShot](./search-for-user-2.png)
 
 ## Disclaimer
 The sample code described herein is provided on an "as is" basis, without warranty of any kind, to the fullest extent permitted by law. ForgeRock does not warrant or guarantee the individual success developers may have in implementing the sample code on their development platforms or in production configurations.

@@ -56,8 +56,7 @@ public class SearchForUserNode implements Node {
         @Attribute(order = 100)
         default String sharedStateAttribute() {
             return USERNAME;
-        };
-
+        }
 
         @Attribute(order = 200)
         default List<String> datastoreAttributes() {
@@ -141,11 +140,14 @@ public class SearchForUserNode implements Node {
         @Override
         public List<Outcome> getOutcomes(PreferredLocales locales, JsonValue nodeAttributes) {
             ResourceBundle bundle = locales.getBundleInPreferredLocale(BUNDLE, OutcomeProvider.class.getClassLoader());
-            return ImmutableList.of(
-                    new Outcome( "found", bundle.getString("found")),
-                    new Outcome("notFound", bundle.getString("notFound")),
-                    new Outcome("ambiguous", bundle.getString("ambiguous")));
+            List<Outcome> results = new ArrayList<>();
+            results.add(new Outcome("found", "Found"));
+            results.add(new Outcome("notFound", "Not Found"));
+            results.add(new Outcome("ambiguous", "Ambiguous"));
+            return Collections.unmodifiableList(results);
         }
     }
 }
+
+
 
