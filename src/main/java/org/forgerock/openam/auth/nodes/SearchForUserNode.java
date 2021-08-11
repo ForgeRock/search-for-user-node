@@ -18,8 +18,6 @@
 package org.forgerock.openam.auth.nodes;
 
 import com.google.inject.assistedinject.Assisted;
-import com.sun.identity.shared.debug.Debug;
-import org.forgerock.guava.common.collect.ImmutableList;
 import org.forgerock.json.JsonValue;
 import org.forgerock.openam.annotations.sm.Attribute;
 import org.forgerock.openam.auth.node.api.*;
@@ -28,6 +26,8 @@ import static org.forgerock.openam.auth.node.api.SharedStateConstants.REALM;
 import static org.forgerock.openam.auth.node.api.SharedStateConstants.USERNAME;
 import org.forgerock.openam.core.CoreWrapper;
 import com.sun.identity.idm.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -40,8 +40,8 @@ import com.sun.identity.idm.IdUtils;
         configClass = SearchForUserNode.Config.class)
 public class SearchForUserNode implements Node {
 
-    private final static String DEBUG_FILE = "SearchForUserNode";
-    protected Debug debug = Debug.getInstance(DEBUG_FILE);
+    private final static String NODE_NAME = "SearchForUserNode";
+    private static final Logger debug = LoggerFactory.getLogger(SearchForUserNode.class);
     private final CoreWrapper coreWrapper;
 
     /**
@@ -82,7 +82,7 @@ public class SearchForUserNode implements Node {
     @Override
     public Action process(TreeContext context) throws NodeProcessException {
    
-        debug.message("[" + DEBUG_FILE + "]: " + "Starting");
+        debug.debug("[" + NODE_NAME + "]: " + "Starting");
         AMIdentity userIdentity = null;
 
         //Pull out the user object
@@ -91,8 +91,8 @@ public class SearchForUserNode implements Node {
         } else {
             Set<String> userSearchAttributes = new HashSet<>();
             userSearchAttributes.add(config.datastoreAttribute());
-            debug.message("[" + DEBUG_FILE + "]: " + "Datastore attribute: {}", config.datastoreAttribute());
-            debug.message("[" + DEBUG_FILE + "]: " + "Shared state attribute: {}, and value: {}", config.sharedStateAttribute(), context.sharedState.get(config.sharedStateAttribute()).asString());
+            debug.debug("[" + NODE_NAME + "]: " + "Datastore attribute: {}", config.datastoreAttribute());
+            debug.debug("[" + NODE_NAME + "]: " + "Shared state attribute: {}, and value: {}", config.sharedStateAttribute(), context.sharedState.get(config.sharedStateAttribute()).asString());
             userIdentity = IdUtils.getIdentity(context.sharedState.get(config.sharedStateAttribute()).asString(), context.sharedState.get(REALM).asString(),userSearchAttributes);
 
         }
@@ -101,12 +101,12 @@ public class SearchForUserNode implements Node {
 
                 if (userIdentity == null) {
 
-                    debug.error("[" + DEBUG_FILE + "]: " + "Unable to find user");
+                    debug.error("[" + NODE_NAME + "]: " + "Unable to find user");
                     return goTo("notFound").build();
 
                 } else {
 
-                    debug.message("[" + DEBUG_FILE + "]: " + "user found: {}", userIdentity.getName());
+                    debug.debug("[" + NODE_NAME + "]: " + "user found: {}", userIdentity.getName());
                     //ensure username is set in sharedstate
                     context.sharedState.put(USERNAME, userIdentity.getName());
                     return goTo("found").build();
@@ -116,7 +116,7 @@ public class SearchForUserNode implements Node {
 
             } catch (Exception e) {
 
-                debug.error("[" + DEBUG_FILE + "]: " + "Node exception", e);
+                debug.error("[" + NODE_NAME + "]: " + "Node exception", e);
                 return goTo("notFound").build();
             }
     }
@@ -131,9 +131,10 @@ public class SearchForUserNode implements Node {
         @Override
         public List<Outcome> getOutcomes(PreferredLocales locales, JsonValue nodeAttributes) {
             ResourceBundle bundle = locales.getBundleInPreferredLocale(BUNDLE, OutcomeProvider.class.getClassLoader());
-            return ImmutableList.of(
-                    new Outcome( "found", bundle.getString("found")),
-                    new Outcome("notFound", bundle.getString("notFound")));
+            List<Outcome> list = new ArrayList<Outcome>();
+            list.add(new Outcome( "found", bundle.getString("found")));
+            list.add(new Outcome("notFound", bundle.getString("notFound")));
+            return list;
         }
     }
 }
